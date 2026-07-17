@@ -5,7 +5,9 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 # Default to SQLite so the project runs with zero external setup.
 # To use PostgreSQL instead, set DATABASE_URL, e.g.:
 #   postgresql://postgres:password@localhost/pizza_delivery
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./pizza_delivery.db")
+#"sqlite:///./pizza_delivery.db"
+
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:kalharamax@localhost/pizza_delivery")
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
 
