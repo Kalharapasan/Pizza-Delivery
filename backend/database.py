@@ -2,6 +2,9 @@ import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
+# Default to SQLite so the project runs with zero external setup.
+# To use PostgreSQL instead, set DATABASE_URL, e.g.:
+#   postgresql://postgres:password@localhost/pizza_delivery
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./pizza_delivery.db")
 
 connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
@@ -14,6 +17,7 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 def get_db():
+    """FastAPI dependency that yields a request-scoped DB session."""
     db = SessionLocal()
     try:
         yield db

@@ -1,65 +1,73 @@
-from pydantic import BaseModel
 from typing import Optional
+from pydantic import BaseModel, EmailStr, ConfigDict, Field
+from models import PizzaSize, OrderStatus
 
 
 class SignUpModel(BaseModel):
-    id:Optional[int]
-    username:str
-    email:str
-    password:str
-    is_staff:Optional[bool]
-    is_active:Optional[bool]
+    username: str = Field(min_length=3, max_length=25)
+    email: EmailStr
+    password: str = Field(min_length=6)
+    is_staff: Optional[bool] = False
+    is_active: Optional[bool] = True
 
-
-    class Config:
-        orm_mode=True
-        schema_extra={
-            'example':{
-                "username":"johndoe",
-                "email":"johndoe@gmail.com",
-                "password":"password",
-                "is_staff":False,
-                "is_active":True
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={
+            "example": {
+                "username": "johndoe",
+                "email": "johndoe@gmail.com",
+                "password": "password",
+                "is_staff": False,
+                "is_active": True,
             }
-        }
+        },
+    )
 
 
+class UserOut(BaseModel):
+    id: int
+    username: str
+    email: EmailStr
+    is_staff: bool
+    is_active: bool
 
-class Settings(BaseModel):
-    authjwt_secret_key:str='b4bb9013c1c03b29b9311ec0df07f3b0d8fd13edd02d5c45b2fa7b86341fa405'
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LoginModel(BaseModel):
-    username:str
-    password:str
+    username: str
+    password: str
 
+
+class TokenPair(BaseModel):
+    access: str
+    refresh: str
 
 
 class OrderModel(BaseModel):
-    id:Optional[int]
-    quantity:int
-    order_status:Optional[str]="PENDING"
-    pizza_size:Optional[str]="SMALL"
-    user_id:Optional[int]
+    quantity: int = Field(gt=0)
+    pizza_size: PizzaSize = PizzaSize.SMALL
+
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={"example": {"quantity": 2, "pizza_size": "LARGE"}},
+    )
 
 
-    class Config:
-        orm_mode=True
-        schema_extra={
-            "example":{
-                "quantity":2,
-                "pizza_size":"LARGE"
-            }
-        }
+class OrderOut(BaseModel):
+    id: int
+    quantity: int
+    pizza_size: PizzaSize
+    order_status: OrderStatus
+    user_id: Optional[int] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class OrderStatusModel(BaseModel):
-    order_status:Optional[str]="PENDING"
+    order_status: OrderStatus = OrderStatus.PENDING
 
-    class Config:
-        orm_mode=True
-        schema_extra={
-            "example":{
-                "order_status":"PENDING"
-            }
-        }
+    model_config = ConfigDict(
+        from_attributes=True,
+        json_schema_extra={"example": {"order_status": "PENDING"}},
+    )

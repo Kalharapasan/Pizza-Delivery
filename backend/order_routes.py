@@ -1,297 +1,132 @@
-from fastapi import APIRouter,Depends,status
+from typing import List
+
+from fastapi import APIRouter, Depends, status
 from fastapi.exceptions import HTTPException
-from fastapi_jwt_auth import AuthJWT
-from models import User,Order
-from schemas import OrderModel,OrderStatusModel
-from database import Session , engine
-from fastapi.encoders import jsonable_encoder
+from sqlalchemy.orm import Session
 
-order_router=APIRouter(
-    prefix="/orders",
-    tags=['orders']
-)
+from database import get_db
+from models import User, Order
+from schemas import OrderModel, OrderOut, OrderStatusModel
+from auth_utils import get_current_user, get_current_staff_user
+
+order_router = APIRouter(prefix="/orders", tags=["orders"])
 
 
-session=Session(bind=engine)
+def _get_owned_order_or_404(db: Session, order_id: int, user: User) -> Order:
+    order = db.query(Order).filter(Order.id == order_id).first()
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No order with such id")
+    if not user.is_staff and order.user_id != user.id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not allowed to carry out request")
+    return order
 
-@order_router.get('/')
-async def hello(Authorize:AuthJWT=Depends()):
 
+@order_router.get("/")
+async def hello(current_user: User = Depends(get_current_user)):
+    """A sample hello world route."""
+    return {"message": "Hello World"}
+
+
+@order_router.post("/order", response_model=OrderOut, status_code=status.HTTP_201_CREATED)
+async def place_an_order(
+    order: OrderModel,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """
-        ## A sample hello world route
-        This returns Hello world
+    ## Placing an Order
+    Requires `quantity` (int) and `pizza_size` (str)
     """
-
-    try:
-        Authorize.jwt_required()
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Token"
-        )
-    return {"message":"Hello World"}
-
-
-@order_router.post('/order',status_code=status.HTTP_201_CREATED)
-async def place_an_order(order:OrderModel,Authorize:AuthJWT=Depends()):
-    """
-        ## Placing an Order
-        This requires the following
-        - quantity : integer
-        - pizza_size: str
-    
-    """
-
-
-    try:
-        Authorize.jwt_required()
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Token"
-        )
-
-    current_user=Authorize.get_jwt_subject()
-
-    user=session.query(User).filter(User.username==current_user).first()
-
-
-    new_order=Order(
+    new_order = Order(
         pizza_size=order.pizza_size,
-        quantity=order.quantity
+        quantity=order.quantity,
+        user=current_user,
     )
 
-    new_order.user=user
+    db.add(new_order)
+    db.commit()
+    db.refresh(new_order)
 
-    session.add(new_order)
-
-    session.commit()
-
-
-    response={
-        "pizza_size":new_order.pizza_size,
-        "quantity":new_order.quantity,
-        "id":new_order.id,
-        "order_status":new_order.order_status
-    }
-
-    return jsonable_encoder(response)
+    return new_order
 
 
+@order_router.get("/orders", response_model=List[OrderOut])
+async def list_all_orders(db: Session = Depends(get_db), current_user: User = Depends(get_current_staff_user)):
+    """## List all orders. Only accessible by staff/superusers."""
+    return db.query(Order).all()
 
-    
-@order_router.get('/orders')
-async def list_all_orders(Authorize:AuthJWT=Depends()):
+
+@order_router.get("/orders/{id}", response_model=OrderOut)
+async def get_order_by_id(id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_staff_user)):
+    """## Get an order by its ID. Only accessible by staff/superusers."""
+    order = db.query(Order).filter(Order.id == id).first()
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No order with such id")
+    return order
+
+
+@order_router.get("/user/orders", response_model=List[OrderOut])
+async def get_user_orders(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """## Get the currently logged-in user's orders."""
+    return db.query(Order).filter(Order.user_id == current_user.id).all()
+
+
+@order_router.get("/user/order/{id}", response_model=OrderOut)
+async def get_specific_order(id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """## Get a specific order belonging to the currently logged-in user."""
+    order = db.query(Order).filter(Order.id == id, Order.user_id == current_user.id).first()
+    if order is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No order with such id")
+    return order
+
+
+@order_router.put("/order/update/{id}", response_model=OrderOut)
+async def update_order(
+    id: int,
+    order: OrderModel,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
     """
-        ## List all orders
-        This lists all  orders made. It can be accessed by superusers
-        
-    
+    ## Updating an order
+    Requires `quantity` (int) and `pizza_size` (str). Only the order's owner or staff may update it.
     """
+    order_to_update = _get_owned_order_or_404(db, id, current_user)
+
+    order_to_update.quantity = order.quantity
+    order_to_update.pizza_size = order.pizza_size
+
+    db.commit()
+    db.refresh(order_to_update)
+
+    return order_to_update
 
 
-    try:
-        Authorize.jwt_required()
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Token"
-        )
+@order_router.patch("/order/update/{id}", response_model=OrderOut)
+async def update_order_status(
+    id: int,
+    order: OrderStatusModel,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_staff_user),
+):
+    """## Update an order's status. Only accessible by staff/superusers."""
+    order_to_update = db.query(Order).filter(Order.id == id).first()
+    if order_to_update is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No order with such id")
 
-    current_user=Authorize.get_jwt_subject()
+    order_to_update.order_status = order.order_status
+    db.commit()
+    db.refresh(order_to_update)
 
-    user=session.query(User).filter(User.username==current_user).first()
-
-    if user.is_staff:
-        orders=session.query(Order).all()
-
-        return jsonable_encoder(orders)
-
-    raise  HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="You are not a superuser"
-        )
+    return order_to_update
 
 
-@order_router.get('/orders/{id}')
-async def get_order_by_id(id:int,Authorize:AuthJWT=Depends()):
-    """
-        ## Get an order by its ID
-        This gets an order by its ID and is only accessed by a superuser
-        
+@order_router.delete("/order/delete/{id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_an_order(id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    """## Delete an order by its ID. Only the order's owner or staff may delete it."""
+    order_to_delete = _get_owned_order_or_404(db, id, current_user)
 
-    """
+    db.delete(order_to_delete)
+    db.commit()
 
-
-    try:
-        Authorize.jwt_required()
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Token"
-        )
-
-    user=Authorize.get_jwt_subject()
-
-    current_user=session.query(User).filter(User.username==user).first()
-
-    if current_user.is_staff:
-        order=session.query(Order).filter(Order.id==id).first()
-
-        return jsonable_encoder(order)
-
-    raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not alowed to carry out request"
-        )
-
-    
-@order_router.get('/user/orders')
-async def get_user_orders(Authorize:AuthJWT=Depends()):
-    """
-        ## Get a current user's orders
-        This lists the orders made by the currently logged in users
-    
-    """
-
-
-    try:
-        Authorize.jwt_required()
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Token"
-        )
-
-    user=Authorize.get_jwt_subject()
-
-
-    current_user=session.query(User).filter(User.username==user).first()
-
-    return jsonable_encoder(current_user.orders)
-
-
-@order_router.get('/user/order/{id}/')
-async def get_specific_order(id:int,Authorize:AuthJWT=Depends()):
-    """
-        ## Get a specific order by the currently logged in user
-        This returns an order by ID for the currently logged in user
-    
-    """
-
-
-    try:
-        Authorize.jwt_required()
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid Token"
-        )
-
-    subject=Authorize.get_jwt_subject()
-
-    current_user=session.query(User).filter(User.username==subject).first()
-
-    orders=current_user.orders
-
-    for o in orders:
-        if o.id == id:
-            return jsonable_encoder(o)
-    
-    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST,
-        detail="No order with such id"
-    )
-
-
-@order_router.put('/order/update/{id}/')
-async def update_order(id:int,order:OrderModel,Authorize:AuthJWT=Depends()):
-    """
-        ## Updating an order
-        This udates an order and requires the following fields
-        - quantity : integer
-        - pizza_size: str
-    
-    """
-
-    try:
-        Authorize.jwt_required()
-
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Invalid Token")
-
-    order_to_update=session.query(Order).filter(Order.id==id).first()
-
-    order_to_update.quantity=order.quantity
-    order_to_update.pizza_size=order.pizza_size
-
-    session.commit()
-
-
-    response={
-                "id":order_to_update.id,
-                "quantity":order_to_update.quantity,
-                "pizza_size":order_to_update.pizza_size,
-                "order_status":order_to_update.order_status,
-            }
-
-    return jsonable_encoder(order_to_update)
-
-    
-@order_router.patch('/order/update/{id}/')
-async def update_order_status(id:int,
-        order:OrderStatusModel,
-        Authorize:AuthJWT=Depends()):
-
-
-    """
-        ## Update an order's status
-        This is for updating an order's status and requires ` order_status ` in str format
-    """
-    try:
-        Authorize.jwt_required()
-
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Invalid Token")
-
-    username=Authorize.get_jwt_subject()
-
-    current_user=session.query(User).filter(User.username==username).first()
-
-    if current_user.is_staff:
-        order_to_update=session.query(Order).filter(Order.id==id).first()
-
-        order_to_update.order_status=order.order_status
-
-        session.commit()
-
-        response={
-                "id":order_to_update.id,
-                "quantity":order_to_update.quantity,
-                "pizza_size":order_to_update.pizza_size,
-                "order_status":order_to_update.order_status,
-            }
-
-        return jsonable_encoder(response)
-
-
-@order_router.delete('/order/delete/{id}/',status_code=status.HTTP_204_NO_CONTENT)
-async def delete_an_order(id:int,Authorize:AuthJWT=Depends()):
-
-    """
-        ## Delete an Order
-        This deletes an order by its ID
-    """
-
-    try:
-        Authorize.jwt_required()
-
-    except Exception as e:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED,detail="Invalid Token")
-
-
-    order_to_delete=session.query(Order).filter(Order.id==id).first()
-
-    session.delete(order_to_delete)
-
-    session.commit()
-
-    return order_to_delete
+    return None
