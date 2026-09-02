@@ -23,6 +23,8 @@ export default function AdminOrders() {
   const [error, setError] = useState("");
   const [filter, setFilter] = useState("ALL");
   const [skip, setSkip] = useState(0);
+  const [userIdInput, setUserIdInput] = useState("");
+  const [userIdFilter, setUserIdFilter] = useState(null);
   const [updatingId, setUpdatingId] = useState(null);
 
   async function loadOrders() {
@@ -33,6 +35,7 @@ export default function AdminOrders() {
           skip,
           limit: PAGE_SIZE,
           ...(filter !== "ALL" ? { order_status: filter } : {}),
+          ...(userIdFilter ? { user_id: userIdFilter } : {}),
         },
       });
       setOrders(data.items);
@@ -45,10 +48,23 @@ export default function AdminOrders() {
   useEffect(() => {
     loadOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filter, skip]);
+  }, [filter, skip, userIdFilter]);
 
   function changeFilter(next) {
     setFilter(next);
+    setSkip(0);
+  }
+
+  function handleSearchSubmit(e) {
+    e.preventDefault();
+    const parsed = userIdInput.trim() ? Number(userIdInput.trim()) : null;
+    setUserIdFilter(Number.isFinite(parsed) ? parsed : null);
+    setSkip(0);
+  }
+
+  function clearSearch() {
+    setUserIdInput("");
+    setUserIdFilter(null);
     setSkip(0);
   }
 
@@ -76,7 +92,7 @@ export default function AdminOrders() {
 
       {error && <div className="alert alert-error">{error}</div>}
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 24, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         {["ALL", ...STATUS_FLOW].map((s) => (
           <button
             key={s}
@@ -87,6 +103,30 @@ export default function AdminOrders() {
           </button>
         ))}
       </div>
+
+      <form onSubmit={handleSearchSubmit} style={{ display: "flex", gap: 8, marginBottom: 24, maxWidth: 320 }}>
+        <input
+          type="number"
+          placeholder="Search by user ID\u2026"
+          value={userIdInput}
+          onChange={(e) => setUserIdInput(e.target.value)}
+          style={{
+            flex: 1,
+            border: "1.5px solid var(--border)",
+            borderRadius: "var(--radius-sm)",
+            padding: "8px 12px",
+            background: "var(--surface)",
+          }}
+        />
+        <button className="btn btn-secondary btn-sm" type="submit">
+          Search
+        </button>
+        {userIdFilter && (
+          <button className="btn btn-ghost btn-sm" type="button" onClick={clearSearch}>
+            Clear
+          </button>
+        )}
+      </form>
 
       {orders === null && <p className="muted">Loading&hellip;</p>}
 

@@ -22,9 +22,9 @@ first — signup/login/orders all call it directly.
   create a staff account)
 - `/menu` — place an order (pick size + quantity)
 - `/my-orders` — your orders with live status, price, and timestamp; edit or
-  cancel while still pending
-- `/admin` — staff-only dashboard: paginated order list, status filter, and
-  status controls
+  cancel while still pending, or reorder past deliveries with one click
+- `/admin` — staff-only dashboard: paginated order list, status filter,
+  search by customer user ID, and status controls
 - `/profile` — update your email or change your password
 
 ## Notes

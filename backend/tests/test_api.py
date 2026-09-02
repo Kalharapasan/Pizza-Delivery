@@ -170,6 +170,26 @@ def test_cannot_edit_non_pending_order():
     assert resp.status_code == 400
 
 
+def test_staff_can_filter_by_user_id():
+    signup("john", is_staff=False)
+    signup("mary", is_staff=False)
+    signup("admin", is_staff=True)
+    john_token = login("john")
+    mary_token = login("mary")
+    admin_token = login("admin")
+
+    client.post("/orders/order", json={"quantity": 1, "pizza_size": "SMALL"}, headers=auth_headers(john_token))
+    client.post("/orders/order", json={"quantity": 2, "pizza_size": "MEDIUM"}, headers=auth_headers(mary_token))
+
+    john_id = client.get("/auth/me", headers=auth_headers(john_token)).json()["id"]
+
+    resp = client.get("/orders/orders", params={"user_id": john_id}, headers=auth_headers(admin_token))
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["total"] == 1
+    assert body["items"][0]["user_id"] == john_id
+
+
 def test_change_password():
     signup("john")
     token = login("john")

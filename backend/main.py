@@ -1,17 +1,41 @@
+import time
+
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.exc import OperationalError
 
-from database import engine, Base
+from database import engine, Base, DATABASE_URL
 from auth_routes import auth_router
 from order_routes import order_router
+
+
+def _create_tables_with_retry(retries: int = 5, delay_seconds: float = 2.0):
+    """
+    MySQL may take a moment to accept connections (e.g. starting up in Docker).
+    Retry table creation a few times before giving up with a clear error.
+    """
+    last_error = None
+    for attempt in range(1, retries + 1):
+        try:
+            Base.metadata.create_all(bind=engine)
+            return
+        except OperationalError as exc:
+            last_error = exc
+            print(f"[startup] Database not ready yet (attempt {attempt}/{retries}): {exc.__class__.__name__}")
+            time.sleep(delay_seconds)
+
+    raise RuntimeError(
+        f"Could not connect to the database at '{DATABASE_URL}' after {retries} attempts. "
+        "Check that MySQL is running and DATABASE_URL / MYSQL_* env vars are correct."
+    ) from last_error
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Create tables on startup so no separate init step is required.
-    Base.metadata.create_all(bind=engine)
+    _create_tables_with_retry()
     yield
 
 

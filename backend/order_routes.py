@@ -62,16 +62,19 @@ async def list_all_orders(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_staff_user),
     order_status: Optional[OrderStatus] = Query(None, description="Filter by order status"),
+    user_id: Optional[int] = Query(None, description="Filter by the customer's user id"),
     skip: int = Query(0, ge=0),
     limit: int = Query(20, ge=1, le=100),
 ):
     """## List all orders, newest first. Only accessible by staff/superusers.
 
-    Supports optional `order_status` filtering and `skip`/`limit` pagination.
+    Supports optional `order_status` and `user_id` filtering, plus `skip`/`limit` pagination.
     """
     query = db.query(Order)
     if order_status is not None:
         query = query.filter(Order.order_status == order_status)
+    if user_id is not None:
+        query = query.filter(Order.user_id == user_id)
 
     total = query.count()
     items = query.order_by(Order.id.desc()).offset(skip).limit(limit).all()

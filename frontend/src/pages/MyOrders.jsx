@@ -63,6 +63,16 @@ export default function MyOrders() {
     }
   }
 
+  async function reorder(order) {
+    try {
+      await client.post("/orders/order", { quantity: order.quantity, pizza_size: order.pizza_size });
+      showToast("Order placed again!");
+      loadOrders();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Couldn't place that order again.");
+    }
+  }
+
   return (
     <div className="container" style={{ paddingTop: 56, paddingBottom: 72 }}>
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28, flexWrap: "wrap", gap: 12 }}>
@@ -164,6 +174,12 @@ export default function MyOrders() {
                       Cancel
                     </button>
                   </div>
+                )}
+
+                {order.order_status === "DELIVERED" && (
+                  <button className="btn btn-secondary btn-sm" onClick={() => reorder(order)}>
+                    Reorder
+                  </button>
                 )}
               </div>
             )}
