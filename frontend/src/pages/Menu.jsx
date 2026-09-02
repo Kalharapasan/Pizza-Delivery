@@ -2,27 +2,27 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import client from "../api/client.js";
 import PizzaSizePicker from "../components/PizzaSizePicker.jsx";
+import { useToast } from "../context/ToastContext.jsx";
 
 const PRICES = { SMALL: 6.5, MEDIUM: 9.5, LARGE: 13, "EXTRA-LARGE": 16.5 };
 
 export default function Menu() {
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [size, setSize] = useState("MEDIUM");
   const [quantity, setQuantity] = useState(1);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const total = (PRICES[size] * quantity).toFixed(2);
 
   async function handleOrder() {
     setError("");
-    setSuccess("");
     setSubmitting(true);
     try {
       await client.post("/orders/order", { quantity, pizza_size: size });
-      setSuccess("Order placed! Track it from My Orders.");
-      setTimeout(() => navigate("/my-orders"), 900);
+      showToast("Order placed! Track it from My Orders.");
+      setTimeout(() => navigate("/my-orders"), 500);
     } catch (err) {
       setError(err.response?.data?.detail || "Couldn't place your order. Please try again.");
     } finally {
@@ -40,7 +40,6 @@ export default function Menu() {
 
       <div className="card" style={{ padding: 32, maxWidth: 640 }}>
         {error && <div className="alert alert-error">{error}</div>}
-        {success && <div className="alert alert-success">{success}</div>}
 
         <label style={{ fontWeight: 600, fontSize: "0.85rem", textTransform: "uppercase", letterSpacing: "0.04em" }}>
           Choose a size

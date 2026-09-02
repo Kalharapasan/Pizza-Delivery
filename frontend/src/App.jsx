@@ -8,6 +8,7 @@ import Signup from "./pages/Signup.jsx";
 import Menu from "./pages/Menu.jsx";
 import MyOrders from "./pages/MyOrders.jsx";
 import AdminOrders from "./pages/AdminOrders.jsx";
+import Profile from "./pages/Profile.jsx";
 import NotFound from "./pages/NotFound.jsx";
 
 export default function App() {
@@ -40,6 +41,14 @@ export default function App() {
             element={
               <ProtectedRoute staffOnly>
                 <AdminOrders />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
               </ProtectedRoute>
             }
           />

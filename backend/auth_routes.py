@@ -4,7 +4,14 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from database import get_db
-from schemas import SignUpModel, LoginModel, UserOut, TokenPair
+from schemas import (
+    SignUpModel,
+    LoginModel,
+    UserOut,
+    TokenPair,
+    UpdateProfileModel,
+    ChangePasswordModel,
+)
 from models import User
 from auth_utils import (
     hash_password,
@@ -28,6 +35,40 @@ async def hello(current_user: User = Depends(get_current_user)):
 async def get_me(current_user: User = Depends(get_current_user)):
     """Return the profile of the currently logged-in user (used by the frontend)."""
     return current_user
+
+
+@auth_router.patch("/me", response_model=UserOut)
+async def update_me(
+    payload: UpdateProfileModel,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """## Update your profile. Currently supports changing your email."""
+    existing = db.query(User).filter(User.email == payload.email, User.id != current_user.id).first()
+    if existing is not None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="That email is already in use")
+
+    current_user.email = payload.email
+    db.commit()
+    db.refresh(current_user)
+
+    return current_user
+
+
+@auth_router.post("/change-password", status_code=status.HTTP_200_OK)
+async def change_password(
+    payload: ChangePasswordModel,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """## Change your password. Requires your current password for verification."""
+    if not verify_password(payload.current_password, current_user.password):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Current password is incorrect")
+
+    current_user.password = hash_password(payload.new_password)
+    db.commit()
+
+    return {"message": "Password updated"}
 
 
 @auth_router.post("/signup", response_model=UserOut, status_code=status.HTTP_201_CREATED)

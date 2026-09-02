@@ -2,10 +2,21 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import client from "../api/client.js";
 import StatusBadge from "../components/StatusBadge.jsx";
+import { useToast } from "../context/ToastContext.jsx";
 
 const SIZE_LABELS = { SMALL: "Small", MEDIUM: "Medium", LARGE: "Large", "EXTRA-LARGE": "Extra-large" };
 
+function formatDate(iso) {
+  return new Date(iso).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function MyOrders() {
+  const { showToast } = useToast();
   const [orders, setOrders] = useState(null);
   const [error, setError] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -34,6 +45,7 @@ export default function MyOrders() {
     try {
       await client.put(`/orders/order/update/${id}`, editForm);
       setEditingId(null);
+      showToast("Order updated");
       loadOrders();
     } catch (err) {
       setError(err.response?.data?.detail || "Couldn't update this order.");
@@ -44,6 +56,7 @@ export default function MyOrders() {
     if (!window.confirm("Cancel this order?")) return;
     try {
       await client.delete(`/orders/order/delete/${id}`);
+      showToast("Order cancelled");
       loadOrders();
     } catch (err) {
       setError(err.response?.data?.detail || "Couldn't cancel this order.");
@@ -52,7 +65,7 @@ export default function MyOrders() {
 
   return (
     <div className="container" style={{ paddingTop: 56, paddingBottom: 72 }}>
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28 }}>
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", marginBottom: 28, flexWrap: "wrap", gap: 12 }}>
         <h1 style={{ fontSize: "2rem" }}>My orders</h1>
         <Link to="/menu" className="btn btn-primary btn-sm">
           + New order
@@ -125,14 +138,20 @@ export default function MyOrders() {
                     flexShrink: 0,
                   }}
                 />
-                <div style={{ minWidth: 160 }}>
+                <div style={{ minWidth: 180 }}>
                   <strong>
                     {order.quantity} &times; {SIZE_LABELS[order.pizza_size] || order.pizza_size}
                   </strong>
-                  <div className="muted">Order #{order.id}</div>
+                  <div className="muted">
+                    Order #{order.id} &middot; {formatDate(order.created_at)}
+                  </div>
                 </div>
 
                 <StatusBadge status={order.order_status} />
+
+                <div style={{ fontWeight: 700, color: "var(--tomato-dark)", fontFamily: "Fraunces, serif" }}>
+                  ${order.total_price.toFixed(2)}
+                </div>
 
                 <div className="spacer" />
 

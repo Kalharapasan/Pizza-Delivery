@@ -1,6 +1,7 @@
 import enum
+from datetime import datetime, timezone
 from database import Base
-from sqlalchemy import Column, Integer, Boolean, Text, String, ForeignKey, Enum as SAEnum
+from sqlalchemy import Column, Integer, Boolean, Text, String, ForeignKey, Enum as SAEnum, DateTime, Float
 from sqlalchemy.orm import relationship
 
 
@@ -15,6 +16,15 @@ class OrderStatus(str, enum.Enum):
     PENDING = "PENDING"
     IN_TRANSIT = "IN-TRANSIT"
     DELIVERED = "DELIVERED"
+
+
+# Single source of truth for pricing, used when an order is placed.
+PIZZA_PRICES = {
+    PizzaSize.SMALL: 6.50,
+    PizzaSize.MEDIUM: 9.50,
+    PizzaSize.LARGE: 13.00,
+    PizzaSize.EXTRA_LARGE: 16.50,
+}
 
 
 class User(Base):
@@ -40,9 +50,12 @@ class Order(Base):
     quantity = Column(Integer, nullable=False)
     order_status = Column(SAEnum(OrderStatus), default=OrderStatus.PENDING, nullable=False)
     pizza_size = Column(SAEnum(PizzaSize), default=PizzaSize.SMALL, nullable=False)
+    total_price = Column(Float, nullable=False, default=0.0)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     user_id = Column(Integer, ForeignKey("user.id"))
 
     user = relationship("User", back_populates="orders")
 
     def __repr__(self):
         return f"<Order {self.id}>"
+

@@ -6,7 +6,7 @@ Python/FastAPI/Pydantic versions.
 ## What changed from the original
 
 - **Removed `fastapi_jwt_auth`** (unmaintained, breaks on modern Pydantic) and
-  replaced it with `python-jose` + `passlib` JWT handling in `auth_utils.py`.
+  replaced it with `python-jose` + `bcrypt` JWT handling in `auth_utils.py`.
 - **Removed `sqlalchemy_utils.ChoiceType`** in favor of plain SQLAlchemy/Python
   `Enum`s (`PizzaSize`, `OrderStatus` in `models.py`) — one less dependency.
 - **SQLite by default** so the project runs instantly with zero setup. Set the
@@ -22,6 +22,22 @@ Python/FastAPI/Pydantic versions.
   React frontend can call the API directly.
 - Upgraded to **Pydantic v2** schemas and **SQLAlchemy 2.0** style.
 
+### Latest additions
+
+- **Server-side pricing**: orders now carry a `total_price`, computed from a
+  fixed price table on the server (never trusted from the client).
+- **Timestamps**: every order has a `created_at`.
+- **Orders can only be edited/cancelled while `PENDING`** — once a staff
+  member moves an order to `IN-TRANSIT` or `DELIVERED`, the customer can no
+  longer change or cancel it.
+- **Pagination + filtering** on `GET /orders/orders`: `skip`, `limit`, and
+  `order_status` query params, returning `{ items, total, skip, limit }`.
+- **Profile management**: `PATCH /auth/me` to change your email, and
+  `POST /auth/change-password` to change your password (requires the current
+  one).
+- **Test suite** in `tests/test_api.py` covering signup/login, ownership
+  rules, staff-only routes, and the new endpoints — run with `pytest`.
+
 ## Setup
 
 ```bash
@@ -36,6 +52,12 @@ The API will be available at `http://127.0.0.1:8000`, with interactive docs at
 `http://127.0.0.1:8000/docs`. Tables are created automatically on startup
 (SQLite file `pizza_delivery.db` in the backend folder).
 
+Run the test suite (uses its own throwaway SQLite file):
+
+```bash
+pytest
+```
+
 ## Environment variables (optional)
 
 | Variable        | Default                              | Description                          |
@@ -48,11 +70,14 @@ The API will be available at `http://127.0.0.1:8000`, with interactive docs at
 - `POST /auth/signup` — create a user
 - `POST /auth/login` — returns `{ access, refresh }` tokens
 - `GET  /auth/refresh?refresh=<token>` — get a fresh access token
+- `GET  /auth/me` — current user's profile
+- `PATCH /auth/me` — update your email
+- `POST /auth/change-password` — change your password
 - `POST /orders/order` — place an order (auth required)
 - `GET  /orders/user/orders` — current user's orders (auth required)
 - `GET  /orders/user/order/{id}` — one of the current user's orders
-- `PUT  /orders/order/update/{id}` — update your own order
-- `DELETE /orders/order/delete/{id}` — delete your own order
-- `GET  /orders/orders` — all orders (staff only)
+- `PUT  /orders/order/update/{id}` — update your own order (only while PENDING)
+- `DELETE /orders/order/delete/{id}` — cancel your own order (only while PENDING)
+- `GET  /orders/orders?order_status=&skip=&limit=` — paginated list of all orders (staff only)
 - `GET  /orders/orders/{id}` — any order by id (staff only)
 - `PATCH /orders/order/update/{id}` — update order status (staff only)

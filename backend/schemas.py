@@ -1,4 +1,5 @@
-from typing import Optional
+from datetime import datetime
+from typing import List, Optional
 from pydantic import BaseModel, EmailStr, ConfigDict, Field
 from models import PizzaSize, OrderStatus
 
@@ -44,8 +45,23 @@ class TokenPair(BaseModel):
     refresh: str
 
 
+class UpdateProfileModel(BaseModel):
+    email: EmailStr
+
+    model_config = ConfigDict(json_schema_extra={"example": {"email": "new-email@example.com"}})
+
+
+class ChangePasswordModel(BaseModel):
+    current_password: str
+    new_password: str = Field(min_length=6)
+
+    model_config = ConfigDict(
+        json_schema_extra={"example": {"current_password": "oldpass1", "new_password": "newpass1"}}
+    )
+
+
 class OrderModel(BaseModel):
-    quantity: int = Field(gt=0)
+    quantity: int = Field(gt=0, le=50)
     pizza_size: PizzaSize = PizzaSize.SMALL
 
     model_config = ConfigDict(
@@ -59,6 +75,8 @@ class OrderOut(BaseModel):
     quantity: int
     pizza_size: PizzaSize
     order_status: OrderStatus
+    total_price: float
+    created_at: datetime
     user_id: Optional[int] = None
 
     model_config = ConfigDict(from_attributes=True)
@@ -71,3 +89,10 @@ class OrderStatusModel(BaseModel):
         from_attributes=True,
         json_schema_extra={"example": {"order_status": "PENDING"}},
     )
+
+
+class PaginatedOrders(BaseModel):
+    items: List[OrderOut]
+    total: int
+    skip: int
+    limit: int

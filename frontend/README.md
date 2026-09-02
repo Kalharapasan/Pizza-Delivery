@@ -21,8 +21,11 @@ first — signup/login/orders all call it directly.
 - `/signup`, `/login` — auth (check "Register as kitchen staff" on signup to
   create a staff account)
 - `/menu` — place an order (pick size + quantity)
-- `/my-orders` — your orders; edit or cancel while still pending
-- `/admin` — staff-only dashboard listing every order with status controls
+- `/my-orders` — your orders with live status, price, and timestamp; edit or
+  cancel while still pending
+- `/admin` — staff-only dashboard: paginated order list, status filter, and
+  status controls
+- `/profile` — update your email or change your password
 
 ## Notes
 
@@ -30,3 +33,8 @@ first — signup/login/orders all call it directly.
   refreshes the access token using the refresh token on a 401.
 - Colors and type scale live in `src/index.css` as CSS variables — change
   `--tomato`, `--basil`, `--crust`, `--bg` etc. to retheme.
+- Order price and timestamps come from the backend (server-computed, never
+  trusted from the client).
+- Toast notifications (`src/context/ToastContext.jsx`) confirm actions like
+  placing an order, updating status, or saving your profile.
+- The navbar collapses into a hamburger menu below 720px.
