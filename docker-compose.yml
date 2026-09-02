@@ -1,0 +1,60 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: pizza_delivery_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: pizza_delivery
+      MYSQL_USER: pizza
+      MYSQL_PASSWORD: pizzapass
+      MYSQL_ROOT_PASSWORD: rootpass
+    ports:
+      - "3306:3306"
+    volumes:
+      - pizza_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpass"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: pizza_delivery_backend
+    restart: unless-stopped
+    environment:
+      MYSQL_USER: pizza
+      MYSQL_PASSWORD: pizzapass
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_DB: pizza_delivery
+      JWT_SECRET_KEY: change-this-to-a-long-random-string-in-production
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: http://localhost:8000
+    container_name: pizza_delivery_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+  adminer:
+    image: adminer
+    container_name: pizza_delivery_adminer
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      - mysql
+
+volumes:
+  pizza_mysql_data:

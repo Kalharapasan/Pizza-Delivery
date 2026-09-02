@@ -20,7 +20,7 @@ export default function MyOrders() {
   const [orders, setOrders] = useState(null);
   const [error, setError] = useState("");
   const [editingId, setEditingId] = useState(null);
-  const [editForm, setEditForm] = useState({ quantity: 1, pizza_size: "SMALL" });
+  const [editForm, setEditForm] = useState({ quantity: 1, pizza_size: "SMALL", delivery_address: "", notes: "" });
 
   async function loadOrders() {
     setError("");
@@ -38,12 +38,24 @@ export default function MyOrders() {
 
   function startEdit(order) {
     setEditingId(order.id);
-    setEditForm({ quantity: order.quantity, pizza_size: order.pizza_size });
+    setEditForm({
+      quantity: order.quantity,
+      pizza_size: order.pizza_size,
+      delivery_address: order.delivery_address,
+      notes: order.notes || "",
+    });
   }
 
   async function saveEdit(id) {
+    if (editForm.delivery_address.trim().length < 5) {
+      setError("Please enter a delivery address (at least 5 characters).");
+      return;
+    }
     try {
-      await client.put(`/orders/order/update/${id}`, editForm);
+      await client.put(`/orders/order/update/${id}`, {
+        ...editForm,
+        notes: editForm.notes.trim() || null,
+      });
       setEditingId(null);
       showToast("Order updated");
       loadOrders();
@@ -65,7 +77,12 @@ export default function MyOrders() {
 
   async function reorder(order) {
     try {
-      await client.post("/orders/order", { quantity: order.quantity, pizza_size: order.pizza_size });
+      await client.post("/orders/order", {
+        quantity: order.quantity,
+        pizza_size: order.pizza_size,
+        delivery_address: order.delivery_address,
+        notes: order.notes,
+      });
       showToast("Order placed again!");
       loadOrders();
     } catch (err) {
@@ -126,6 +143,20 @@ export default function MyOrders() {
                     />
                   </div>
                 </div>
+                <div className="field">
+                  <label>Delivery address</label>
+                  <input
+                    value={editForm.delivery_address}
+                    onChange={(e) => setEditForm((f) => ({ ...f, delivery_address: e.target.value }))}
+                  />
+                </div>
+                <div className="field">
+                  <label>Notes (optional)</label>
+                  <input
+                    value={editForm.notes}
+                    onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                  />
+                </div>
                 <div style={{ display: "flex", gap: 10 }}>
                   <button className="btn btn-primary btn-sm" onClick={() => saveEdit(order.id)}>
                     Save changes
@@ -154,6 +185,10 @@ export default function MyOrders() {
                   </strong>
                   <div className="muted">
                     Order #{order.id} &middot; {formatDate(order.created_at)}
+                  </div>
+                  <div className="muted" style={{ marginTop: 2 }}>
+                    &#128205; {order.delivery_address}
+                    {order.notes && <> &middot; &ldquo;{order.notes}&rdquo;</>}
                   </div>
                 </div>
 

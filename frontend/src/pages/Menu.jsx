@@ -11,6 +11,8 @@ export default function Menu() {
   const { showToast } = useToast();
   const [size, setSize] = useState("MEDIUM");
   const [quantity, setQuantity] = useState(1);
+  const [address, setAddress] = useState(() => localStorage.getItem("last_delivery_address") || "");
+  const [notes, setNotes] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -18,9 +20,21 @@ export default function Menu() {
 
   async function handleOrder() {
     setError("");
+
+    if (address.trim().length < 5) {
+      setError("Please enter a delivery address (at least 5 characters).");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      await client.post("/orders/order", { quantity, pizza_size: size });
+      await client.post("/orders/order", {
+        quantity,
+        pizza_size: size,
+        delivery_address: address.trim(),
+        notes: notes.trim() || null,
+      });
+      localStorage.setItem("last_delivery_address", address.trim());
       showToast("Order placed! Track it from My Orders.");
       setTimeout(() => navigate("/my-orders"), 500);
     } catch (err) {
@@ -48,7 +62,7 @@ export default function Menu() {
           <PizzaSizePicker value={size} onChange={setSize} />
         </div>
 
-        <div style={{ display: "flex", alignItems: "flex-end", gap: 24, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "flex-end", gap: 24, flexWrap: "wrap", marginBottom: 24 }}>
           <div className="field" style={{ marginBottom: 0 }}>
             <label htmlFor="quantity">Quantity</label>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -80,6 +94,27 @@ export default function Menu() {
               ${total}
             </div>
           </div>
+        </div>
+
+        <div className="field">
+          <label htmlFor="address">Delivery address</label>
+          <input
+            id="address"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="e.g. 12 Galle Road, Colombo 03"
+            required
+          />
+        </div>
+
+        <div className="field" style={{ marginBottom: 0 }}>
+          <label htmlFor="notes">Delivery notes (optional)</label>
+          <input
+            id="notes"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="e.g. Ring the bell twice, leave at the gate"
+          />
         </div>
 
         <button

@@ -18,6 +18,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from database import Base, engine
+from limiter import limiter
 from main import app
 
 client = TestClient(app)
@@ -26,6 +27,7 @@ client = TestClient(app)
 @pytest.fixture(autouse=True)
 def fresh_db():
     Base.metadata.create_all(bind=engine)
+    limiter.reset()
     yield
     Base.metadata.drop_all(bind=engine)
 
@@ -74,7 +76,7 @@ def test_login_wrong_password_rejected():
 
 
 def test_place_order_requires_auth():
-    resp = client.post("/orders/order", json={"quantity": 1, "pizza_size": "SMALL"})
+    resp = client.post("/orders/order", json={"quantity": 1, "pizza_size": "SMALL", "delivery_address": "123 Test Street"})
     assert resp.status_code == 401
 
 
@@ -84,7 +86,7 @@ def test_place_and_fetch_order():
 
     resp = client.post(
         "/orders/order",
-        json={"quantity": 2, "pizza_size": "LARGE"},
+        json={"quantity": 2, "pizza_size": "LARGE", "delivery_address": "123 Test Street"},
         headers=auth_headers(token),
     )
     assert resp.status_code == 201
@@ -104,12 +106,12 @@ def test_user_cannot_access_other_users_order():
     mary_token = login("mary")
 
     order_id = client.post(
-        "/orders/order", json={"quantity": 1, "pizza_size": "SMALL"}, headers=auth_headers(john_token)
+        "/orders/order", json={"quantity": 1, "pizza_size": "SMALL", "delivery_address": "123 Test Street"}, headers=auth_headers(john_token)
     ).json()["id"]
 
     resp = client.put(
         f"/orders/order/update/{order_id}",
-        json={"quantity": 5, "pizza_size": "LARGE"},
+        json={"quantity": 5, "pizza_size": "LARGE", "delivery_address": "123 Test Street"},
         headers=auth_headers(mary_token),
     )
     assert resp.status_code == 401
@@ -130,7 +132,7 @@ def test_staff_can_list_and_update_status():
     admin_token = login("admin")
 
     order_id = client.post(
-        "/orders/order", json={"quantity": 1, "pizza_size": "MEDIUM"}, headers=auth_headers(john_token)
+        "/orders/order", json={"quantity": 1, "pizza_size": "MEDIUM", "delivery_address": "123 Test Street"}, headers=auth_headers(john_token)
     ).json()["id"]
 
     resp = client.get("/orders/orders", headers=auth_headers(admin_token))
@@ -153,7 +155,7 @@ def test_cannot_edit_non_pending_order():
     admin_token = login("admin")
 
     order_id = client.post(
-        "/orders/order", json={"quantity": 1, "pizza_size": "SMALL"}, headers=auth_headers(john_token)
+        "/orders/order", json={"quantity": 1, "pizza_size": "SMALL", "delivery_address": "123 Test Street"}, headers=auth_headers(john_token)
     ).json()["id"]
 
     client.patch(
@@ -164,10 +166,51 @@ def test_cannot_edit_non_pending_order():
 
     resp = client.put(
         f"/orders/order/update/{order_id}",
-        json={"quantity": 3, "pizza_size": "LARGE"},
+        json={"quantity": 3, "pizza_size": "LARGE", "delivery_address": "123 Test Street"},
         headers=auth_headers(john_token),
     )
     assert resp.status_code == 400
+
+
+def test_login_is_rate_limited():
+    signup()
+    # 10/minute is the limit; the 11th attempt in the same minute should be blocked
+    for _ in range(10):
+        client.post("/auth/login", json={"username": "john", "password": "wrong"})
+    resp = client.post("/auth/login", json={"username": "john", "password": "wrong"})
+    assert resp.status_code == 429
+
+
+def test_delivery_address_is_required():
+    signup()
+    token = login()
+
+    resp = client.post(
+        "/orders/order",
+        json={"quantity": 1, "pizza_size": "SMALL"},  # no delivery_address
+        headers=auth_headers(token),
+    )
+    assert resp.status_code == 422
+
+
+def test_delivery_address_and_notes_stored():
+    signup()
+    token = login()
+
+    resp = client.post(
+        "/orders/order",
+        json={
+            "quantity": 1,
+            "pizza_size": "MEDIUM",
+            "delivery_address": "45 Main Street, Apt 2B",
+            "notes": "No onions please",
+        },
+        headers=auth_headers(token),
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["delivery_address"] == "45 Main Street, Apt 2B"
+    assert body["notes"] == "No onions please"
 
 
 def test_staff_can_filter_by_user_id():
@@ -178,8 +221,8 @@ def test_staff_can_filter_by_user_id():
     mary_token = login("mary")
     admin_token = login("admin")
 
-    client.post("/orders/order", json={"quantity": 1, "pizza_size": "SMALL"}, headers=auth_headers(john_token))
-    client.post("/orders/order", json={"quantity": 2, "pizza_size": "MEDIUM"}, headers=auth_headers(mary_token))
+    client.post("/orders/order", json={"quantity": 1, "pizza_size": "SMALL", "delivery_address": "123 Test Street"}, headers=auth_headers(john_token))
+    client.post("/orders/order", json={"quantity": 2, "pizza_size": "MEDIUM", "delivery_address": "123 Test Street"}, headers=auth_headers(mary_token))
 
     john_id = client.get("/auth/me", headers=auth_headers(john_token)).json()["id"]
 

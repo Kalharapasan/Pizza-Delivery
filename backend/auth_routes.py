@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Request, status
 from fastapi.exceptions import HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from database import get_db
+from limiter import limiter
 from schemas import (
     SignUpModel,
     LoginModel,
@@ -56,7 +57,9 @@ async def update_me(
 
 
 @auth_router.post("/change-password", status_code=status.HTTP_200_OK)
+@limiter.limit("5/minute")
 async def change_password(
+    request: Request,
     payload: ChangePasswordModel,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -72,7 +75,8 @@ async def change_password(
 
 
 @auth_router.post("/signup", response_model=UserOut, status_code=status.HTTP_201_CREATED)
-async def signup(user: SignUpModel, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+async def signup(request: Request, user: SignUpModel, db: Session = Depends(get_db)):
     """
     ## Create a user
     Requires: `username`, `email`, `password`, `is_staff`, `is_active`
@@ -99,7 +103,8 @@ async def signup(user: SignUpModel, db: Session = Depends(get_db)):
 
 
 @auth_router.post("/login", response_model=TokenPair, status_code=status.HTTP_200_OK)
-async def login(user: LoginModel, db: Session = Depends(get_db)):
+@limiter.limit("10/minute")
+async def login(request: Request, user: LoginModel, db: Session = Depends(get_db)):
     """
     ## Login a user
     Requires `username` and `password`, returns a token pair `access` and `refresh`.

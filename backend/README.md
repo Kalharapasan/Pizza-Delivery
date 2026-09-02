@@ -40,11 +40,20 @@ Python/FastAPI/Pydantic versions.
 
 ### Latest additions
 
+- **Delivery address & notes**: placing an order now requires a
+  `delivery_address` (server-validated, min 5 characters) and accepts an
+  optional `notes` field (e.g. "ring the bell twice").
+- **Rate limiting** (`slowapi`) on `/auth/signup`, `/auth/login`, and
+  `/auth/change-password` — 5–10 requests/minute per IP, returns `429` when
+  exceeded, to slow down brute-force attempts.
+- **Dockerfile** for the backend, plus a **root-level `docker-compose.yml`**
+  that builds and runs the whole stack (MySQL + backend + frontend +
+  Adminer) with one command — see the project root `README.md`.
 - **Now connects to MySQL by default** (via `PyMySQL`, a pure-Python driver —
   no system `libmysqlclient` needed). SQLite is still available as an opt-in
   fallback for quick local testing.
-- **`docker-compose.yml`** spins up MySQL + Adminer (a web DB browser) with
-  one command — see Setup below.
+- **`docker-compose.yml`** (in this folder) spins up MySQL + Adminer alone,
+  for when you want to run the backend itself outside Docker.
 - **`.env` support** (`python-dotenv`) — copy `.env.example` to `.env` and
   fill in your MySQL credentials instead of exporting env vars by hand.
 - **Startup retry logic**: if MySQL isn't ready yet when the app starts, it
@@ -70,11 +79,23 @@ Python/FastAPI/Pydantic versions.
 
 ## Setup
 
-### Option A — MySQL via Docker (recommended)
+### Option A — Full stack with Docker (easiest)
+
+From the **project root** (one level up from `backend/`):
+
+```bash
+docker compose up -d --build
+```
+
+This builds and starts MySQL, the backend, the frontend, and Adminer together.
+See the root `README.md` for the URLs. Skip straight to using the app — no
+`pip install` needed on your machine.
+
+### Option B — Backend on your machine, MySQL via Docker
 
 ```bash
 cd backend
-docker compose up -d          # starts MySQL on :3306 and Adminer on :8080
+docker compose up -d          # starts MySQL on :3306 and Adminer on :8080 (this folder's own compose file)
 python -m venv venv
 source venv/bin/activate      # Windows: venv\Scripts\activate
 pip install -r requirements.txt
@@ -85,7 +106,7 @@ uvicorn main:app --reload
 Adminer (a simple DB GUI) is now at `http://localhost:8080` — server
 `mysql`, user `pizza`, password `pizzapass`, database `pizza_delivery`.
 
-### Option B — MySQL you already have running
+### Option C — MySQL you already have running
 
 ```bash
 cd backend
@@ -103,7 +124,7 @@ CREATE DATABASE pizza_delivery;
 ```
 Tables are then created automatically on startup.
 
-### Option C — SQLite (no MySQL needed, quick local testing)
+### Option D — SQLite (no MySQL needed, quick local testing)
 
 ```bash
 cd backend

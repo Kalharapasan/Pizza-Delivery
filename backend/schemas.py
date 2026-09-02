@@ -63,10 +63,19 @@ class ChangePasswordModel(BaseModel):
 class OrderModel(BaseModel):
     quantity: int = Field(gt=0, le=50)
     pizza_size: PizzaSize = PizzaSize.SMALL
+    delivery_address: str = Field(min_length=5, max_length=255)
+    notes: Optional[str] = Field(default=None, max_length=500)
 
     model_config = ConfigDict(
         from_attributes=True,
-        json_schema_extra={"example": {"quantity": 2, "pizza_size": "LARGE"}},
+        json_schema_extra={
+            "example": {
+                "quantity": 2,
+                "pizza_size": "LARGE",
+                "delivery_address": "12 Galle Road, Colombo 03",
+                "notes": "Ring the bell twice, leave at the gate",
+            }
+        },
     )
 
 
@@ -76,6 +85,8 @@ class OrderOut(BaseModel):
     pizza_size: PizzaSize
     order_status: OrderStatus
     total_price: float
+    delivery_address: str
+    notes: Optional[str] = None
     created_at: datetime
     user_id: Optional[int] = None
 

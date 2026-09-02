@@ -4,9 +4,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi.errors import RateLimitExceeded
+from slowapi import _rate_limit_exceeded_handler
 from sqlalchemy.exc import OperationalError
 
 from database import engine, Base, DATABASE_URL
+from limiter import limiter
 from auth_routes import auth_router
 from order_routes import order_router
 
@@ -45,6 +48,9 @@ app = FastAPI(
     description="An API for a Pizza Delivery Service",
     lifespan=lifespan,
 )
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Allow the React frontend (Vite dev server) to call this API.
 app.add_middleware(

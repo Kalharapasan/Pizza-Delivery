@@ -47,6 +47,8 @@ async def place_an_order(
         pizza_size=order.pizza_size,
         quantity=order.quantity,
         total_price=_price_for(order),
+        delivery_address=order.delivery_address,
+        notes=order.notes,
         user=current_user,
     )
 
@@ -129,6 +131,8 @@ async def update_order(
     order_to_update.quantity = order.quantity
     order_to_update.pizza_size = order.pizza_size
     order_to_update.total_price = _price_for(order)
+    order_to_update.delivery_address = order.delivery_address
+    order_to_update.notes = order.notes
 
     db.commit()
     db.refresh(order_to_update)

@@ -144,12 +144,16 @@ export default function AdminOrders() {
             className="card"
             style={{ padding: 20, display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}
           >
-            <div style={{ minWidth: 180 }}>
+            <div style={{ minWidth: 200 }}>
               <strong>
                 {order.quantity} &times; {SIZE_LABELS[order.pizza_size] || order.pizza_size}
               </strong>
               <div className="muted">
                 Order #{order.id} &middot; user #{order.user_id} &middot; {formatDate(order.created_at)}
+              </div>
+              <div className="muted" style={{ marginTop: 2 }}>
+                &#128205; {order.delivery_address}
+                {order.notes && <> &middot; &ldquo;{order.notes}&rdquo;</>}
               </div>
             </div>
 
